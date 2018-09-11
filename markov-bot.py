@@ -3,7 +3,14 @@ print("Logging in now...")
 import discord
 import asyncio
 
-import sqlite3, copy, random, traceback, collections, urllib.request, urllib, json, sys, time
+import sqlite3, copy, random, traceback, collections, urllib.request, urllib, json, sys, time, configparser
+config = configparser.ConfigParser()
+config.read('config.cfg')
+
+bot_key = config['DEFAULT']['BOT_KEY']
+bot_name = config['DEFAULT']['BOT_NAME']
+bot_prefix = config['DEFAULT']['BOT_PREFIX']
+
 sys.path.append(".")
 import mask
 con = sqlite3.connect("markov.db")
@@ -12,15 +19,13 @@ con.execute("CREATE INDEX IF NOT EXISTS the_index ON main (key, value)")
 con.execute("CREATE TABLE IF NOT EXISTS poll_users (user INT, vote INT);")
 con.execute("CREATE TABLE IF NOT EXISTS poll_options (id INT, option TEXT);")
 
-org_channel = "392057195530813453"
-
 client = discord.Client()
 
 def allowed(x):
   if x == "🛑": return False
   if x == ":octagonal_sign:": return False
   if x[0] == "<" and x[1] == "@": return False
-  if x == "!markov": return False
+  if x == (bot_prefix + bot_name): return False
   return True
 
 def make_ok(x):
@@ -99,39 +104,6 @@ def get_percents(word):
     message.append(block[0] + ": " + str(float(block[1] * 100)/total)[:4] + "%")
   return ", ".join(message) + "\nWord seen " + str(total) + " time" + ("s" if total != 1 else "")
 
-def start_poll(users, options):
-  con.execute("DELETE FROM poll_users;")
-  con.execute("DELETE FROM poll_options;")
-  query = "INSERT INTO poll_users (user, vote) VALUES "
-  query += ", ".join(["(?, null)"] * len(users))
-  con.execute(query, [int(x) for x in users])
-  for i in range(len(options)):
-    query = "INSERT INTO poll_options (id, option) VALUES (?, ?)"
-    con.execute(query, [i, options[i]])
-
-def cast_vote(message, split):
-  if len(split) == 1:
-    return "\n".join([str(x[0]) + " - " + x[1] for x in con.execute("SELECT id, option from poll_options order by id asc").fetchall()])
-  res = con.execute("SELECT vote FROM poll_users WHERE user = ?", [int(message.author.id)]).fetchall()
-  if len(res) == 0:
-    return "You were not in the server when the vote was initiated, and cannot cast a vote"
-  try:
-    vote = int(split[1])
-  except:
-    return "Invalid number `" + split[1].replace("`","") + "`"
-  con.execute("UPDATE poll_users SET vote = ? where user = ?", [vote, int(message.author.id)])
-  return True
-
-def get_votes():
-  query = "select pu.vote, count(*) as c, po.option from poll_users pu left join poll_options po on po.id = pu.vote where vote is not null group by pu.vote order by c desc"
-  res = con.execute(query).fetchall()
-  if len(res) == 0: return False
-  total_count = sum(x[1] for x in res) / len(res)
-  msg = []
-  for row in res:
-    msg.append(str(row[0]) + " - " + row[2] + " - " + str(row[1]) + " votes, " + str(round(100 * row[1] / total_count, 2)))
-  return "\n".join(msg)
-
 @client.event
 async def on_ready():
   print('Logged in as')
@@ -150,6 +122,9 @@ async def on_message(message):
   if type(message.channel) == discord.channel.PrivateChannel:
     print("DISCARDING PRIVATE MESSAGE FROM", message.author)
     return
+  if (message.content.startswith(';')):
+    print("DISCARDING COMMENT MESSAGE FROM ", message.author)
+    return
   if "markov-bot" in str(message.author) or "MikuBot" in str(message.author):
     print("Discarding self message")
     return
@@ -159,9 +134,9 @@ async def on_message(message):
   if split[0] in ["?femboy", "?tomboy"]:
     if "welcome-center" in str(message.channel):
       await client.send_message(message.server.get_channel('308342435430400012'), "Welcome <@" +str(message.author.id) + ">!");
-  elif split[0] == "!help":
-    await client.send_message(message.channel, "Commands: `!markov` - Generates random text based on collected probabilities\n`!markov <starting word>` - Generates starting from a particular word\n`!markov <limit>` - Generates random text with the given length\n`!percents <word>` - Shows statistics on the given word\n`!mask <message>` - Misspells some text\n`!mask10 <message>` - Misspells some text 10 times")
-  elif split[0] == "!markov":
+  elif split[0] == (bot_prefix + "help"):
+    await client.send_message(message.channel, "Commands: `" + bot_prefix + bot_name + "` - Generates random text based on collected probabilities\n`" + bot_prefix + bot_name + "<starting word>` - Generates starting from a particular word\n`" + bot_prefix + bot_name + " <limit>` - Generates random text with the given length\n`" + bot_prefix + "percents <word>` - Shows statistics on the given word\n`" + bot_prefix + "mask <message>` - Misspells some text\n`" + bot_prefix + "mask10 <message>` - Misspells some text 10 times")
+  elif split[0] == (bot_prefix + bot_name):
     await client.send_typing(message.channel)
     args = message.content.split()
     arg = False
@@ -169,35 +144,20 @@ async def on_message(message):
       arg = args[1]
     print("Sending")
     await client.send_message(message.channel, make_message(arg))
-  elif split[0] == "!percents" and len(split) > 1:
+  elif split[0] == (bot_prefix + "percents") and len(split) > 1:
     percents = get_percents(split[1])
     await client.send_message(message.channel, percents)
-  elif split[0] == "!mask":
+  elif split[0] == (bot_prefix + "mask"):
     await client.send_message(message.channel, mask.mask(" ".join(split[1:])))
-  elif split[0] == "!mask10":
+  elif split[0] == (bot_prefix + "mask10"):
     msg = []
     curr = mask.mask(" ".join(split[1:]))
     for i in range(10):
       msg.append(curr)
       curr = mask.mask(curr)
     await client.send_message(message.channel, "\n".join(msg))
-  elif split[0] == "!poll" and message.author.id == "158673755105787904":
-    options = [x.strip() for x in message.content.split("\n") if len(x.strip()) > 0 and x != "!poll"]
-    users = [x.id for x in message.server.members]
-    if len(users) == 0 or len(options) == 0:
-      await client.send_message(message.channel, "Error - zero options or zero users")
-    start_poll(users, options)
-    await client.send_message(message.channel, "Poll started with " + str(len(options)) + " and " + str(len(users)) + " authorized users")
-  elif split[0] == "!vote" and message.channel.id == org_channel:
-    result = cast_vote(message, split)
-    if result == True:
-      await client.add_reaction(message, "✅")
-    else:
-      await client.send_message(message.channel, result)
-  elif split[0] == "!votes" and message.channel.id == org_channel:
-    msg = get_votes()
-    if msg: await client.send_message(message.channel, msg)
   else:
     markov_add(message.content);
   print("Took " + str(time.time() - start) + " seconds to process message of " + str(len(split)) + " words");
 
+client.run(bot_key)

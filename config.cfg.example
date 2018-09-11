@@ -1,0 +1,4 @@
+[DEFAULT]
+BOT_KEY = key of your bot
+BOT_NAME = markov
+BOT_PREFIX = !

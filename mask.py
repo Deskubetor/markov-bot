@@ -1,5 +1,5 @@
 import random, string
-keyboard = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+keyboard = ["azertyuiop", "qsdfghjklm", "wxcvbn"]
 bit = lambda: random.randint(0, 1)
 def near(letter):
 	if letter not in string.ascii_letters: return letter
