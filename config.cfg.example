@@ -2,3 +2,4 @@
 BOT_KEY = key of your bot
 BOT_NAME = markov
 BOT_PREFIX = !
+BOT_TRAINNING_CHANNELS = channelId1,channelId2,channelId3

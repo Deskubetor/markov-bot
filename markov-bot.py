@@ -10,6 +10,7 @@ config.read('config.cfg')
 bot_key = config['DEFAULT']['BOT_KEY']
 bot_name = config['DEFAULT']['BOT_NAME']
 bot_prefix = config['DEFAULT']['BOT_PREFIX']
+bot_trainning_channels = config['DEFAULT']['BOT_TRAINNING_CHANNELS'].split(",")
 
 sys.path.append(".")
 import mask
@@ -122,9 +123,6 @@ async def on_message(message):
   if type(message.channel) == discord.channel.PrivateChannel:
     print("DISCARDING PRIVATE MESSAGE FROM", message.author)
     return
-  if (message.content.startswith(';')):
-    print("DISCARDING COMMENT MESSAGE FROM ", message.author)
-    return
   if "markov-bot" in str(message.author) or "MikuBot" in str(message.author):
     print("Discarding self message")
     return
@@ -135,7 +133,7 @@ async def on_message(message):
     if "welcome-center" in str(message.channel):
       await client.send_message(message.server.get_channel('308342435430400012'), "Welcome <@" +str(message.author.id) + ">!");
   elif split[0] == (bot_prefix + "help"):
-    await client.send_message(message.channel, "Commands: `" + bot_prefix + bot_name + "` - Generates random text based on collected probabilities\n`" + bot_prefix + bot_name + "<starting word>` - Generates starting from a particular word\n`" + bot_prefix + bot_name + " <limit>` - Generates random text with the given length\n`" + bot_prefix + "percents <word>` - Shows statistics on the given word\n`" + bot_prefix + "mask <message>` - Misspells some text\n`" + bot_prefix + "mask10 <message>` - Misspells some text 10 times")
+    await client.send_message(message.channel, "Commands: `" + bot_prefix + bot_name + "` - Generates random text based on collected probabilities\n`" + bot_prefix + bot_name + "<starting word>` - Generates starting from a particular word\n`" + bot_prefix + bot_name + " <limit>` - Generates random text with the given length\n`" + bot_prefix + "percents <word>` - Shows statistics on the given word\n`" + bot_prefix + "mask <message>` - Misspells some text\n`" + bot_prefix + "mask10 <message>` - Misspells some text 10 times\n`"+ bot_prefix + " <message>` - Comment that will not be processed by the bot\n`")
   elif split[0] == (bot_prefix + bot_name):
     await client.send_typing(message.channel)
     args = message.content.split()
@@ -156,8 +154,13 @@ async def on_message(message):
       msg.append(curr)
       curr = mask.mask(curr)
     await client.send_message(message.channel, "\n".join(msg))
-  else:
+  elif (message.content.startswith(bot_prefix)):
+    print("DISCARDING COMMENT MESSAGE FROM ", message.author)
+    return
+  elif message.channel.id in bot_trainning_channels:
     markov_add(message.content);
+  else:
+    print("DISCARDING MESSAGE OUTSIDE TRAINNING CHANNELS FROM", message.author)
   print("Took " + str(time.time() - start) + " seconds to process message of " + str(len(split)) + " words");
 
 client.run(bot_key)
