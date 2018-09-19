@@ -12,6 +12,8 @@ bot_name = config['DEFAULT']['BOT_NAME']
 bot_prefix = config['DEFAULT']['BOT_PREFIX']
 bot_trainning_channels = config['DEFAULT']['BOT_TRAINNING_CHANNELS'].split(",")
 
+train_in_all = "*" in bot_trainning_channels
+
 sys.path.append(".")
 import mask
 con = sqlite3.connect("markov.db")
@@ -176,7 +178,7 @@ async def on_message(message):
   elif (message.content.startswith(bot_prefix)):
     print("DISCARDING COMMENT MESSAGE FROM ", message.author)
     return
-  elif message.channel.id in bot_trainning_channels:
+  elif train_in_all or message.channel.id in bot_trainning_channels:
     markov_add(message.content);
   else:
     print("DISCARDING MESSAGE OUTSIDE TRAINNING CHANNELS FROM", message.author)
