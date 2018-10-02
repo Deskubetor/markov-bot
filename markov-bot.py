@@ -12,6 +12,8 @@ bot_name = config['DEFAULT']['BOT_NAME']
 bot_prefix = config['DEFAULT']['BOT_PREFIX']
 bot_trainning_channels = config['DEFAULT']['BOT_TRAINNING_CHANNELS'].split(",")
 
+train_in_all = "*" in bot_trainning_channels
+
 sys.path.append(".")
 import mask
 con = sqlite3.connect("markov.db")
@@ -105,6 +107,19 @@ def get_percents(word):
     message.append(block[0] + ": " + str(float(block[1] * 100)/total)[:4] + "%")
   return ", ".join(message) + "\nWord seen " + str(total) + " time" + ("s" if total != 1 else "")
 
+def top(limit):
+  if limit < 1:
+    limit = 10
+  elif limit > 50:
+    limit = 50
+  words = con.execute("SELECT key, SUM(count) FROM main GROUP BY key ORDER BY SUM(count) DESC LIMIT ?", [limit])
+  message = ""
+  i=1
+  for word in words:
+    message += str(i) + ") \"" + word[0] + "\" seen " + str(word[1]) + " times\n"
+    i += 1
+  return message
+  
 @client.event
 async def on_ready():
   print('Logged in as')
@@ -145,6 +160,12 @@ async def on_message(message):
   elif split[0] == (bot_prefix + "percents") and len(split) > 1:
     percents = get_percents(split[1])
     await client.send_message(message.channel, percents)
+  elif split[0] == (bot_prefix + "top"):
+    if len(split) > 1 and str.isdigit(split[1]):
+      mess = top(int(split[1]))
+    else:
+      mess = top(10)
+    await client.send_message(message.channel, mess)
   elif split[0] == (bot_prefix + "mask"):
     await client.send_message(message.channel, mask.mask(" ".join(split[1:])))
   elif split[0] == (bot_prefix + "mask10"):
@@ -157,7 +178,7 @@ async def on_message(message):
   elif (message.content.startswith(bot_prefix)):
     print("DISCARDING COMMENT MESSAGE FROM ", message.author)
     return
-  elif message.channel.id in bot_trainning_channels:
+  elif train_in_all or message.channel.id in bot_trainning_channels:
     markov_add(message.content);
   else:
     print("DISCARDING MESSAGE OUTSIDE TRAINNING CHANNELS FROM", message.author)
